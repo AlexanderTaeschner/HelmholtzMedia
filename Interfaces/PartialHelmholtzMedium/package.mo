@@ -240,8 +240,21 @@ protected
 
     Real RES[3] "residual function vector";
     Real RSS "residual sum of squares";
+    Real RSS_old "residual sum of squares";
     Real Jacobian[3,3] "Jacobian matrix";
     Real NS[3] "Newton step vector";
+    Real grad[3] "gradient vector";
+    Real slope;
+
+    EoS.HelmholtzDerivs fl_med;
+    EoS.HelmholtzDerivs fv_med;
+    SaturationProperties oldsat;
+    EoS.HelmholtzDerivs f_med;
+    Real[3] RES_med "residual function vector";
+    Real[3] xyz;
+    Real[3] xyz_old;
+    Real[3] xyz_med;
+    Real[3,3] Jacobian_med "Jacobian matrix";
 
     constant Real lambda(min=0.1,max=1) = 1 "convergence speed, default=1";
     constant Real tolerance=1e-4 "tolerance for RSS";
@@ -253,12 +266,10 @@ protected
     // Modelica.Utilities.Streams.print("setSat_p: p=" + String(p), "printlog.txt");
 
   if ((p>p_trip) and (p<p_crit)) then
-    // calculate start values
-    // sat.Tsat  := 1/(1/T_crit - (1/T_trip-1/T_crit)/log(p_crit/p_trip)*log(p/p_crit));
-    // at lower p the difference between dl and dv is bigger
-    sat.Tsat := 0.99*Ancillary.saturationTemperature_p(p=p);
-    sat.liq.d := Ancillary.bubbleDensity_T(T=sat.Tsat);
-    sat.vap.d := Ancillary.dewDensity_T(T=sat.Tsat);
+    // calculate start values, density should be outside of two-phase dome
+    sat.Tsat := Ancillary.saturationTemperature_p(p=p);
+    sat.liq.d := 1.02*Ancillary.bubbleDensity_T(T=sat.Tsat);
+    sat.vap.d := 0.98*Ancillary.dewDensity_T(T=sat.Tsat);
 
     // calculate residuals: RES=calc-input
     fl := EoS.setHelmholtzDerivsSecond(d=sat.liq.d, T=sat.Tsat, phase=1);
@@ -272,13 +283,29 @@ protected
       // calculate Jacobian matrix and Newton Step vector
       Jacobian := [+EoS.dpdT(fl), +0,            +EoS.dpTd(fl);
                    +0,            +EoS.dpdT(fv), +EoS.dpTd(fv);
-                   +EoS.dgdT(fl), -EoS.dgdT(fv), EoS.dgTd(fl)-EoS.dgTd(fv)];
+                   +EoS.dgdT(fl), -EoS.dgdT(fv), +EoS.dgTd(fl)-EoS.dgTd(fv)];
       NS := -Modelica.Math.Matrices.solve(Jacobian,RES);
+      grad := Jacobian*RES;
+      slope := grad*NS;
+      assert(slope<0,"roundoff problem, input was p=" + String(p));
 
-      // calculate better sat.liq.d, sat.vap.d and sat.Tsat
-      sat.liq.d := sat.liq.d + lambda*NS[1];
-      sat.vap.d := sat.vap.d + lambda*NS[2];
-      sat.Tsat  := sat.Tsat  + lambda*NS[3];
+      // store old sat values
+      oldsat := sat;
+      RSS_old := RSS;
+
+      // Babajee
+      xyz_old := {sat.liq.d, sat.vap.d, sat.Tsat};
+      xyz_med := xyz_old + NS;
+      fl_med := EoS.setHelmholtzDerivsSecond(d=xyz_med[1], T=xyz_med[3], phase=1);
+      fv_med := EoS.setHelmholtzDerivsSecond(d=xyz_med[2], T=xyz_med[3], phase=1);
+      RES_med := {EoS.p(fl_med)-p, EoS.p(fv_med)-p, EoS.g(fl_med)-EoS.g(fv_med)};
+      Jacobian_med := [+EoS.dpdT(fl_med), +0,                +EoS.dpTd(fl_med);
+                       +0,                +EoS.dpdT(fv_med), +EoS.dpTd(fv_med);
+                       +EoS.dgdT(fl_med), -EoS.dgdT(fv_med), +EoS.dgTd(fl_med)-EoS.dgTd(fv_med)];
+      xyz := xyz_med - Modelica.Math.Matrices.inv(Jacobian)*RES_med;
+      sat.liq.d:= xyz[1];
+      sat.vap.d:= xyz[2];
+      sat.Tsat := xyz[3];
 
       // check bounds
       sat.liq.d := max(sat.liq.d, 0.98*d_crit);
