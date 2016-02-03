@@ -1,8 +1,5 @@
 within HelmholtzMedia.Interfaces;
 partial package PartialHelmholtzMedium
-  extends HelmholtzMedia.Interfaces.Types;
-
-
   extends HelmholtzMedia.Interfaces.Choices;
 
 
@@ -13,9 +10,10 @@ partial package PartialHelmholtzMedium
     DipoleMoment(min=0, max=5),
     AbsolutePressure(min=Modelica.Constants.small, max=1e12),
     SpecificEntropy(min=-Modelica.Constants.inf, max=Modelica.Constants.inf),
-    ThermoStates = Choices.IndependentVariables.ph);
-
-  constant HelmholtzMedia.Interfaces.Types.FluidLimits fluidLimits;
+    ThermoStates = Modelica.Media.Interfaces.Choices.IndependentVariables.ph);
+  import HelmholtzMedia.Interfaces.Types.*;
+  
+  constant Modelica.Media.Interfaces.Types.FluidLimits fluidLimits;
 
   constant EoS.HelmholtzCoefficients helmholtzCoefficients;
 
