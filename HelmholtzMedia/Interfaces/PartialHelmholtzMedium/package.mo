@@ -366,16 +366,17 @@ protected
     sat.vap := setState_dTX1p(d=sat.vap.d, T=sat.Tsat);
 
   elseif (p>=p_crit) then
+    assert(false, "setSat_p error: pressure is higher than critical pressure");
     // assert(p <= p_crit, "setSat_p error: pressure is higher than critical pressure", level=AssertionLevel.warning);
     // above critical pressure, no stable two-phase state exists
     // anyway, it is possible to extend the vapour-pressure curve into this region
     // this can happen when called from BaseProperties
     // one possibility is to use the state where ds/dT=max or ds/dp=max or dcp/dT=max or dcp/dp=max
     // here, the critical isochore is returned
-    sat.psat  := p;
-    sat.liq := setState_pd(p=p, d=d_crit, phase=1);
-    sat.vap := sat.liq;
-    sat.Tsat := sat.liq.T;
+    //sat.psat  := p;
+    //sat.liq := setState_pd(p=p, d=d_crit, phase=1);
+    //sat.vap := sat.liq;
+    //sat.Tsat := sat.liq.T;
   elseif (p<=p_trip) then
     // at pressures below triple point pressure, only single-phase vapor is possible
     // just return triple-point values
