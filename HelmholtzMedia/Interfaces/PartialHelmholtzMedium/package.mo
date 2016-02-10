@@ -227,8 +227,8 @@ protected
                           "; the remaining residuals are RES_J=" + String(RES[1]) +
                           " and RES_K=" + String(RES[2]));
 
-    sat.liq := setState_dTX(d=delta_liq*d_crit, T=T, phase=1);
-    sat.vap := setState_dTX(d=delta_vap*d_crit, T=T, phase=1);
+    sat.liq := setState_dTX1p(d=delta_liq*d_crit, T=T);
+    sat.vap := setState_dTX1p(d=delta_vap*d_crit, T=T);
     sat.psat := (sat.liq.p+sat.vap.p)/2;
 
   elseif (T>=T_crit) then
@@ -238,8 +238,8 @@ protected
     // this can happen when called from BaseProperties
     // one possibility is use the state where ds/dT=max or ds/dp=max or dcp/dT=max or dcp/dp=max
     // here, the critical isochore is returned
-    sat.liq := setState_dTX(d=d_crit, T=T, phase=1);
-    sat.vap := setState_dTX(d=d_crit, T=T, phase=1);
+    sat.liq := setState_dTX1p(d=d_crit, T=T);
+    sat.vap := setState_dTX1p(d=d_crit, T=T);
     sat.psat := (sat.liq.p+sat.vap.p)/2;
   else
     // assert(T >= T_trip, "setSat_T error: Temperature is lower than triple-point temperature", level=AssertionLevel.warning);
@@ -250,8 +250,8 @@ protected
     delta_liq := (T_trip/sat.Tsat)*Ancillary.bubbleDensity_T(T=T_trip)/d_crit;
     delta_vap := (sat.Tsat/T_trip)*Ancillary.dewDensity_T(T=T_trip)/d_crit;
 
-    sat.liq := setState_dTX(d=delta_liq*d_crit, T=T, phase=1);
-    sat.vap := setState_dTX(d=delta_vap*d_crit, T=T, phase=1);
+    sat.liq := setState_dTX1p(d=delta_liq*d_crit, T=T);
+    sat.vap := setState_dTX1p(d=delta_vap*d_crit, T=T);
     sat.psat := (sat.liq.p+sat.vap.p)/2;
   end if;
 
@@ -362,8 +362,8 @@ protected
     sat.Tsat  := max(sat.Tsat,  T_trip);
     sat.Tsat  := min(sat.Tsat,  T_crit);
 
-    sat.liq := setState_dTX(d=sat.liq.d, T=sat.Tsat, phase=1);
-    sat.vap := setState_dTX(d=sat.vap.d, T=sat.Tsat, phase=1);
+    sat.liq := setState_dTX1p(d=sat.liq.d, T=sat.Tsat);
+    sat.vap := setState_dTX1p(d=sat.vap.d, T=sat.Tsat);
 
   elseif (p>=p_crit) then
     // assert(p <= p_crit, "setSat_p error: pressure is higher than critical pressure", level=AssertionLevel.warning);
@@ -493,6 +493,28 @@ protected
     end if;
 
   end setState_dTX;
+
+
+  function setState_dTX1p
+  "Return thermodynamic single-phase state as function of (d, T)"
+    extends Modelica.Icons.Function;
+    input Density d "Density";
+    input Temperature T "Temperature";
+    input MassFraction X[:]=reference_X "Mass fractions";
+    output ThermodynamicState state "Thermodynamic state record";
+protected
+    EoS.HelmholtzDerivs f;
+
+  algorithm
+    state.phase := 1;
+    state.d := d;
+    state.T := T;
+    f := EoS.setHelmholtzDerivsFirst(d=d,T=T);
+    state.p := EoS.p(f=f);
+    state.s := EoS.s(f=f);
+    state.h := EoS.h(f=f);
+    state.u := EoS.u(f=f);
+  end setState_dTX1p;
 
 
   redeclare function setState_Tx
@@ -737,8 +759,8 @@ protected
 
     Boolean useLineSearch=helmholtzCoefficients.useLineSearch;
     Integer iterLineSearch = 0;
-    Real RSS_ls;
-    Real lambda_ls;
+    Real RSS_ls = 0;
+    Real lambda_ls = 1;
     constant Real lambda_min = 0.01 "minimum for convergence speed";
     Real lambda_temp = 1 "temporary variable for convergence speed";
     constant Real alpha(min=0,max=1)=1e-4;
